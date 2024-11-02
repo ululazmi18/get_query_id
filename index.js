@@ -251,7 +251,7 @@ async function main() {
         console.log('1. Login dengan nomor telepon');
         console.log('2. Login dengan QR Code');
         console.log('3. Login dengan file sesi');
-        console.log('4. Kirim WebView untuk semua klien');
+        console.log('4. Mendapatkan Query/User ID dari semua klien');
         console.log('5. exit');
 
         const choice = await askQuestion("Silakan pilih opsi: ");
