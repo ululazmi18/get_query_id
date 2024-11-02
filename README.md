@@ -4,7 +4,7 @@
      cd get_query_id
      ```
 
-### **Instal Paket:
+### Instal Paket:
      ```bash
      npm install
      ```
