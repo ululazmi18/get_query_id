@@ -1,13 +1,9 @@
 ### Clone Repository:
-     ```
      git clone https://github.com/ululazmi18/get_query_id.git
      cd get_query_id
-     ```
 
 ### Instal Paket:
-     ```
      npm install
-     ```
 
 ### Buat File `.env`:
    - Di dalam folder proyek, buat file `.env`.
@@ -18,6 +14,4 @@
      ```
 
 ### Jalankan Skrip:
-     ```
      node index.js
-     ```
