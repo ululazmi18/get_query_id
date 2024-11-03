@@ -2,6 +2,7 @@ require('dotenv').config(); // Mengimpor dotenv
 
 const { Api, TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
+const logger2 = require('./TldLogger');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -27,7 +28,7 @@ const accounts = new Map();
 async function loginWithPhoneNumber() {
     const phoneNumber = await askQuestion("nomor telepon Anda (misalnya, +1234567890): ");
     const stringSession = new StringSession('');
-    const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5 });
+    const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5, baseLogger: logger2 });
 
     await client.start({
         phoneNumber: async () => phoneNumber,
@@ -55,7 +56,7 @@ async function loginWithPhoneNumber() {
 // Fungsi untuk login menggunakan QR Code
 async function loginWithQRCode() {
     const stringSession = new StringSession('');
-    const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5 });
+    const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5, baseLogger: logger2 });
 
     while (true) {
         try {
@@ -129,19 +130,13 @@ async function loginWithSessionFile() {
 
     const sessionFiles = fs.readdirSync(sessionFolder).filter(file => file.endsWith('.session'));
 
-    console.log('Pilih file sesi untuk login:');
-    sessionFiles.forEach((file, index) => {
-        console.log(`${index + 1}. ${file}`);
-    });
-
-    const selectedFileIndex = parseInt(await askQuestion("Masukkan nomor file sesi (atau 0 untuk semua): "), 10);
-
-    if (selectedFileIndex === 0) {
-        for (const file of sessionFiles) {
-            await handleSessionFile(file);
-        }
-    } else {
-        await handleSessionFile(sessionFiles[selectedFileIndex - 1]);
+    console.log(`Total file sesi: ${sessionFiles.length}`);
+    
+    let counter = 1; // Inisialisasi counter untuk penomoran
+    for (const file of sessionFiles) {
+        console.log(`${counter}/${sessionFiles.length} | ${file}`);
+        await handleSessionFile(file);
+        counter++;
     }
 }
 
@@ -155,15 +150,15 @@ async function handleSessionFile(selectedFile) {
     }
 
     try {
-        const client = new TelegramClient(new StringSession(sessionData), apiId, apiHash, { connectionRetries: 5 });
+        const client = new TelegramClient(new StringSession(sessionData), apiId, apiHash, { connectionRetries: 5, baseLogger: logger2 });
         await client.start({ onError: (error) => console.error("Koneksi gagal, mencoba lagi") });
         const phone = selectedFile.replace('.session', '');
-        console.log(`Login menggunakan file sesi: ${selectedFile}`);
         accounts.set(phone, client);
     } catch (error) {
-        console.error(`Gagal login menggunakan file sesi ${selectedFile}:`, error.message);
+        console.error(`Gagal login ${selectedFile}:`, error.message);
     }
 }
+
 
 // Fungsi untuk meminta WebView untuk klien
 async function requestWebViewForClient(client, phoneNumber, botPeer, url) {
@@ -251,7 +246,7 @@ async function main() {
         console.log('1. Login dengan nomor telepon');
         console.log('2. Login dengan QR Code');
         console.log('3. Login dengan file sesi');
-        console.log('4. Mendapatkan Query/User ID dari semua klien');
+        console.log('4. Kirim WebView untuk semua klien');
         console.log('5. exit');
 
         const choice = await askQuestion("Silakan pilih opsi: ");
