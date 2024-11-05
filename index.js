@@ -193,7 +193,7 @@ async function requestWebViewForAllClients() {
     }
 
     const botPeer = await askQuestion("Silakan masukkan bot peer (misalnya, @YourBot): ");
-    const url = await askQuestion("Silakan masukkan URL WebView: ");
+    const url = await askQuestion("Silakan masukkan URL refferal: ");
     const latestResults = [];
     const webviewFolder = 'webview_results';
 
@@ -246,8 +246,8 @@ async function main() {
         console.log('1. Login dengan nomor telepon');
         console.log('2. Login dengan QR Code');
         console.log('3. Login dengan file sesi');
-        console.log('4. Kirim WebView untuk semua klien');
-        console.log('5. exit');
+        console.log('4. Meminta Query ID ke semua klien');
+        console.log('5. Keluar');
 
         const choice = await askQuestion("Silakan pilih opsi: ");
 
