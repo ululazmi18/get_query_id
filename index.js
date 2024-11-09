@@ -15,6 +15,11 @@ const sessionFolder = 'sessions';
 const webviewFolder = 'webview_results';
 const queryFolder = 'query';
 
+if (!apiId || !apiHash) {
+    console.error('API_ID atau API_HASH belum didefinisikan di file .env');
+    process.exit(1);
+}
+
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
