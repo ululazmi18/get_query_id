@@ -16,7 +16,7 @@ const webviewFolder = 'webview_results';
 const queryFolder = 'query';
 
 if (!apiId || !apiHash) {
-    console.error('API_ID atau API_HASH belum didefinisikan di file .env');
+    console.error('\nAPI_ID atau API_HASH belum didefinisikan di file .env\n');
     process.exit(1);
 }
 
