@@ -74,8 +74,18 @@ async function selectBot() {
 }
 
 // Fungsi untuk login menggunakan nomor telepon
+
 async function loginWithPhoneNumber() {
-    const phoneNumber = await askQuestion("nomor telepon Anda (misalnya, +1234567890): ");
+    const phoneNumber = await askQuestion("Nomor telepon Anda (misalnya, +1234567890): ");
+    const sanitizedPhone = phoneNumber.replace(/\D/g, ''); // Sanitasi nomor telepon
+    const sessionFile = path.join(sessionFolder, `${sanitizedPhone}.session`);
+
+    // Periksa apakah file session sudah ada
+    if (fs.existsSync(sessionFile)) {
+        console.log(`Sesi untuk nomor telepon ${phoneNumber} sudah ada di ${sessionFile}`);
+        return; // Keluarkan fungsi jika file session sudah ada
+    }
+
     const stringSession = new StringSession('');
     const client = new TelegramClient(stringSession, apiId, apiHash, { 
         connectionRetries: 5, 
@@ -93,13 +103,13 @@ async function loginWithPhoneNumber() {
     console.log('Login berhasil');
 
     const sessionString = client.session.save();
-    const sanitizedPhone = phoneNumber.replace(/\D/g, '');
-    const sessionFile = path.join(sessionFolder, `${sanitizedPhone}.session`);
 
+    // Buat folder untuk menyimpan session jika belum ada
     if (!fs.existsSync(sessionFolder)) {
         fs.mkdirSync(sessionFolder, { recursive: true });
     }
 
+    // Simpan sesi dalam file
     fs.writeFileSync(sessionFile, sessionString, 'utf8');
     console.log(`Sesi disimpan di ${sessionFile}`);
 
@@ -153,14 +163,22 @@ async function loginWithQRCode() {
             console.log('Login berhasil');
             const sessionString = client.session.save();
             const me = await client.getMe();
-            const sanitizedPhone = me.phone || me.username || "qr_code_login";
+            const sanitizedPhone = me.phone || me.username || "qr_code_login";  // Gunakan nomor telepon atau username
             const sessionFile = path.join(sessionFolder, `${sanitizedPhone}.session`);
 
+            // Periksa apakah file session sudah ada
+            if (fs.existsSync(sessionFile)) {
+                console.log(`Sesi untuk ${sanitizedPhone} sudah ada di ${sessionFile}`);
+                break; // Keluar jika session sudah ada
+            }
+
+            // Jika file session belum ada, simpan sesi
             if (!fs.existsSync(sessionFolder)) {
                 fs.mkdirSync(sessionFolder, { recursive: true });
             }
 
             fs.writeFileSync(sessionFile, sessionString, 'utf8');
+            console.log(`Sesi disimpan di ${sessionFile}`);
             break;
         } catch (error) {
             console.log("Mencoba lagi untuk mendapatkan QR code baru...");
