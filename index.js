@@ -1,5 +1,4 @@
-require('dotenv').config(); // Mengimpor dotenv
-
+require('dotenv').config();
 const { Api, TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const logger2 = require('./TldLogger');
@@ -9,8 +8,12 @@ const readline = require('readline');
 const qrcode = require('qrcode-terminal');
 
 const intro = 'Telegram Query ID Bot';
-const apiId = Number(process.env.API_ID); // API ID Anda
-const apiHash = process.env.API_HASH; // API Hash Anda
+const apiId = Number(process.env.API_ID);
+const apiHash = process.env.API_HASH;
+const botFilePath = 'bot.json';
+const sessionFolder = 'sessions';
+const webviewFolder = 'webview_results';
+const queryFolder = 'query';
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -22,13 +25,63 @@ function askQuestion(question) {
     return new Promise(resolve => rl.question(question, resolve));
 }
 
-const accounts = new Map();
+// Fungsi untuk memuat atau membuat file bot.json
+function loadBotData() {
+    if (!fs.existsSync(botFilePath)) {
+        fs.writeFileSync(botFilePath, JSON.stringify({}), 'utf8');
+    }
+    const data = fs.readFileSync(botFilePath, 'utf8');
+    return JSON.parse(data);
+}
+
+// Fungsi untuk menyimpan data ke file bot.json
+function saveBotData(data) {
+    fs.writeFileSync(botFilePath, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// Fungsi untuk menampilkan daftar bot yang tersedia
+async function selectBot() {
+    const botData = loadBotData();
+    const botPeers = Object.keys(botData);
+
+    console.log("Pilih Bot:");
+    console.log("1. Tambah bot baru");
+
+    botPeers.forEach((botPeer, index) => {
+        console.log(`${index + 2}. ${botPeer}`);
+    });
+
+    const choice = await askQuestion("Masukkan pilihan Anda: ");
+    if (choice === '1') {
+        const botPeer = await askQuestion("Silakan masukkan bot peer (misalnya, @YourBot): ");
+        const url = await askQuestion("Silakan masukkan URL Refferal: ");
+        botData[botPeer] = url;
+        saveBotData(botData);
+        console.log(`Bot ${botPeer} telah disimpan dengan URL: ${url}`);
+        return { botPeer, url };
+    } else {
+        const index = parseInt(choice, 10) - 2;
+        if (index >= 0 && index < botPeers.length) {
+            const botPeer = botPeers[index];
+            const url = botData[botPeer];
+            console.log(`Menggunakan bot: ${botPeer} dengan URL: ${url}`);
+            return { botPeer, url };
+        } else {
+            console.log("Pilihan tidak valid.");
+            return null;
+        }
+    }
+}
 
 // Fungsi untuk login menggunakan nomor telepon
 async function loginWithPhoneNumber() {
     const phoneNumber = await askQuestion("nomor telepon Anda (misalnya, +1234567890): ");
     const stringSession = new StringSession('');
-    const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5, baseLogger: logger2 });
+    const client = new TelegramClient(stringSession, apiId, apiHash, { 
+        connectionRetries: 5, 
+        timeout: 1800000, 
+        baseLogger: logger2 
+    });
 
     await client.start({
         phoneNumber: async () => phoneNumber,
@@ -40,7 +93,6 @@ async function loginWithPhoneNumber() {
     console.log('Login berhasil');
 
     const sessionString = client.session.save();
-    const sessionFolder = 'sessions';
     const sanitizedPhone = phoneNumber.replace(/\D/g, '');
     const sessionFile = path.join(sessionFolder, `${sanitizedPhone}.session`);
 
@@ -50,13 +102,19 @@ async function loginWithPhoneNumber() {
 
     fs.writeFileSync(sessionFile, sessionString, 'utf8');
     console.log(`Sesi disimpan di ${sessionFile}`);
-    accounts.set(phoneNumber, client);
+
+    await client.disconnect();
+    await client.destroy();
 }
 
 // Fungsi untuk login menggunakan QR Code
 async function loginWithQRCode() {
     const stringSession = new StringSession('');
-    const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5, baseLogger: logger2 });
+    const client = new TelegramClient(stringSession, apiId, apiHash, { 
+        connectionRetries: 5, 
+        timeout: 1800000, 
+        baseLogger: logger2 
+    });
 
     while (true) {
         try {
@@ -88,19 +146,14 @@ async function loginWithQRCode() {
                     console.error("Error saat login dengan QR code:", error);
                     if (error.code === 400 && error.errorMessage === 'AUTH_TOKEN_EXPIRED') {
                         console.log("Token kedaluwarsa. Coba lagi untuk mendapatkan QR code baru.");
-                        return; // keluar dari try dan mulai ulang loop untuk mendapatkan QR code baru
                     }
                 },
             });
 
             console.log('Login berhasil');
-
             const sessionString = client.session.save();
-            const sessionFolder = 'sessions';
-
-            // Mendapatkan informasi pengguna
             const me = await client.getMe();
-            const sanitizedPhone = me.phone || me.username || "qr_code_login"; // Menggunakan nomor telepon atau nama pengguna
+            const sanitizedPhone = me.phone || me.username || "qr_code_login";
             const sessionFile = path.join(sessionFolder, `${sanitizedPhone}.session`);
 
             if (!fs.existsSync(sessionFolder)) {
@@ -108,39 +161,17 @@ async function loginWithQRCode() {
             }
 
             fs.writeFileSync(sessionFile, sessionString, 'utf8');
-            console.log(`Sesi disimpan di ${sessionFile}`);
-            accounts.set(sanitizedPhone, client);
-            break; // keluar dari loop setelah berhasil login
-
+            break;
         } catch (error) {
-            console.error("Gagal login:", error.message);
             console.log("Mencoba lagi untuk mendapatkan QR code baru...");
         }
     }
+
+    await client.disconnect();
+    await client.destroy();
 }
 
-// Fungsi untuk login menggunakan file sesi
-async function loginWithSessionFile() {
-    const sessionFolder = 'sessions';
-
-    if (!fs.existsSync(sessionFolder) || fs.readdirSync(sessionFolder).length === 0) {
-        console.log('Tidak ada file sesi yang ditemukan.');
-        return;
-    }
-
-    const sessionFiles = fs.readdirSync(sessionFolder).filter(file => file.endsWith('.session'));
-
-    console.log(`Total file sesi: ${sessionFiles.length}`);
-    
-    let counter = 1; // Inisialisasi counter untuk penomoran
-    for (const file of sessionFiles) {
-        console.log(`${counter}/${sessionFiles.length} | ${file}`);
-        await handleSessionFile(file);
-        counter++;
-    }
-}
-
-async function handleSessionFile(selectedFile) {
+async function handleSessionFile(selectedFile, botPeer, url, latestResults) {
     const sessionFolder = 'sessions';
     const sessionData = fs.readFileSync(path.join(sessionFolder, selectedFile), 'utf8');
 
@@ -149,78 +180,57 @@ async function handleSessionFile(selectedFile) {
         return;
     }
 
+    let client; // Deklarasi client di sini agar bisa diakses dalam finally
+
     try {
-        const client = new TelegramClient(new StringSession(sessionData), apiId, apiHash, { connectionRetries: 5, baseLogger: logger2 });
-        await client.start({ onError: (error) => console.error("Koneksi gagal, mencoba lagi") });
-        const phone = selectedFile.replace('.session', '');
-        accounts.set(phone, client);
+        client = new TelegramClient(new StringSession(sessionData), apiId, apiHash, { 
+            connectionRetries: 5, 
+            timeout: 1800000, 
+            baseLogger: logger2 
+        });
+
+        // Gunakan start() untuk autentikasi
+        await client.start();
+
+        // Meminta WebView untuk client
+        await requestWebViewForClient(client, selectedFile, botPeer, url, latestResults);
     } catch (error) {
-        console.error(`Gagal login ${selectedFile}:`, error.message);
+        console.log(`Gagal login ${selectedFile}`, error);
     }
+
+    await client.disconnect();
+    await client.destroy();
 }
 
+async function loginWithSessionFile() {
+    const sessionFolder = 'sessions';
+    const latestResults = [];
+    const webviewFolder = 'webview_results';
+    const botFilePath = 'bot.json';
+    let counter = 1;
 
-// Fungsi untuk meminta WebView untuk klien
-async function requestWebViewForClient(client, phoneNumber, botPeer, url) {
-    try {
-        const result = await client.invoke(
-            new Api.messages.RequestWebView({
-                peer: botPeer,
-                bot: botPeer,
-                fromBotMenu: false,
-                url: url,
-                platform: 'android',
-            })
-        );
-
-        const webAppData = decodeURIComponent(result.url.split('#')[1].split('&')[0].split('=')[1]);
-        const urlObject = decodeURIComponent(result.url);
-        const cekFilePath = 'cek.txt';
-        fs.writeFileSync(cekFilePath, JSON.stringify(urlObject, null, 2)); // Simpan hasil sebagai JSON
-
-        return { phoneNumber, webAppData };
-    } catch (error) {
-        console.error("Error saat meminta WebView:", error);
-        return null;
-    }
-}
-
-// Fungsi untuk meminta WebView untuk semua klien
-async function requestWebViewForAllClients() {
-    if (accounts.size === 0) {
-        console.log('Tidak ada akun yang masuk.');
+    if (!fs.existsSync(sessionFolder) || fs.readdirSync(sessionFolder).length === 0) {
+        console.log('Tidak ada file sesi yang ditemukan.');
         return;
     }
 
-    const botPeer = await askQuestion("Silakan masukkan bot peer (misalnya, @YourBot): ");
-    const url = await askQuestion("Silakan masukkan URL refferal: ");
-    const latestResults = [];
-    const webviewFolder = 'webview_results';
+    // Memilih bot
+    const botSelection = await selectBot();
+    if (!botSelection) {
+        console.log("Gagal memilih bot. Program akan berhenti.");
+        process.exit(1);
+    }
 
-    for (const [phoneNumber, client] of accounts.entries()) {
-        console.log(`Memproses akun: ${phoneNumber}`);
-        const result = await requestWebViewForClient(client, phoneNumber, botPeer, url);
-        if (result) {
-            latestResults.push(result);
-            const sanitizedPhone = phoneNumber.replace(/\D/g, '');
-            const resultFile = path.join(webviewFolder, `${sanitizedPhone}.txt`);
+    const { botPeer, url } = botSelection;
+    const sessionFiles = fs.readdirSync(sessionFolder).filter(file => file.endsWith('.session'));
 
-            if (!fs.existsSync(webviewFolder)) {
-                fs.mkdirSync(webviewFolder, { recursive: true });
-            }
+    console.log(`Total file sesi: ${sessionFiles.length}`);
 
-            let fileContent = '';
-            if (fs.existsSync(resultFile)) {
-                fileContent = fs.readFileSync(resultFile, 'utf8');
-                const filteredContent = fileContent
-                    .split('\n')
-                    .filter(line => !line.startsWith(`Bot: ${botPeer} | WebAppData:`))
-                    .join('\n');
-                fs.writeFileSync(resultFile, filteredContent, 'utf8');
-            }
-
-            fs.writeFileSync(resultFile, `Bot: ${botPeer} | WebAppData: ${result.webAppData}\n`, { flag: 'a' });
-        }
+    // Proses semua file sesi
+    for (const file of sessionFiles) {
+        console.log(`Login - ${counter}/${sessionFiles.length} | ${file}          \r`);
+        await handleSessionFile(file, botPeer, url, latestResults);
+        counter++;
     }
 
     // Menyimpan hasil ke file khusus untuk bot
@@ -237,6 +247,27 @@ async function requestWebViewForAllClients() {
     console.log(`Hasil untuk ${botPeer} disimpan di ${botFile}`);
 }
 
+// Fungsi untuk meminta WebView untuk klien
+async function requestWebViewForClient(client, phoneNumber, botPeer, url, latestResults) {
+    try {
+        const result = await client.invoke(
+            new Api.messages.RequestWebView({
+                peer: botPeer,
+                bot: botPeer,
+                fromBotMenu: false,
+                url: url,
+                platform: 'android',
+            })
+        );
+
+        const webAppData = decodeURIComponent(result.url.split('#')[1].split('&')[0].split('=')[1]);
+        latestResults.push({ phoneNumber, webAppData });
+        console.log('\x1b[32mGET Query ID\x1b[0m');
+    } catch (error) {
+        console.log(`Error saat meminta Query ID: ${phoneNumber}`);
+    }
+}
+
 // Fungsi utama untuk menangani input pengguna
 async function main() {
     console.log('Selamat datang di Utilitas Bot Telegram!');
@@ -245,12 +276,10 @@ async function main() {
     while (true) {
         console.log('1. Login dengan nomor telepon');
         console.log('2. Login dengan QR Code');
-        console.log('3. Login dengan file sesi');
-        console.log('4. Meminta Query ID ke semua klien');
-        console.log('5. Keluar');
+        console.log('3. Meminta Query ID ke semua klien');
+        console.log('4. Keluar');
 
         const choice = await askQuestion("Silakan pilih opsi: ");
-
         switch (choice) {
             case '1':
                 await loginWithPhoneNumber();
@@ -262,14 +291,11 @@ async function main() {
                 await loginWithSessionFile();
                 break;
             case '4':
-                await requestWebViewForAllClients();
-                break;
-            case '5':
-                process.exit();
+                process.exit(1);
             default:
                 console.log("Pilihan tidak valid.");
         }
     }
 }
 
-main().catch(console.error);
+main();
