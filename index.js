@@ -227,8 +227,10 @@ async function handleSessionFile(selectedFile, botPeer, url, latestResults) {
 
 async function loginWithSessionFile() {
     const sessionFolder = 'sessions';
-    if (!fs.existsSync(sessionFolder) || fs.readdirSync(sessionFolder).length === 0) {
-        console.log('Tidak ada file sesi yang ditemukan.');
+    const sessionFiles = fs.readdirSync(sessionFolder).filter(file => file.endsWith('.session'));
+
+    if (sessionFiles.length === 0) {
+        console.log('Tidak ada file sesi (.session) yang ditemukan.');
         return;
     }
 
@@ -245,7 +247,6 @@ async function loginWithSessionFile() {
     }
 
     const { botPeer, url } = botSelection;
-    const sessionFiles = fs.readdirSync(sessionFolder).filter(file => file.endsWith('.session'));
 
     console.log(`Total file sesi: ${sessionFiles.length}`);
 
