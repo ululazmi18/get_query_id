@@ -227,15 +227,15 @@ async function handleSessionFile(selectedFile, botPeer, url, latestResults) {
 
 async function loginWithSessionFile() {
     const sessionFolder = 'sessions';
-    const latestResults = [];
-    const webviewFolder = 'webview_results';
-    const botFilePath = 'bot.json';
-    let counter = 1;
-
     if (!fs.existsSync(sessionFolder) || fs.readdirSync(sessionFolder).length === 0) {
         console.log('Tidak ada file sesi yang ditemukan.');
         return;
     }
+
+    const latestResults = [];
+    const webviewFolder = 'webview_results';
+    const botFilePath = 'bot.json';
+    let counter = 1;
 
     // Memilih bot
     const botSelection = await selectBot();
