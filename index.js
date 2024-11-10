@@ -50,6 +50,7 @@ async function selectBot() {
     const botPeers = Object.keys(botData);
 
     console.log("Pilih Bot:");
+    console.log("0. Kembali");
     console.log("1. Tambah bot baru");
 
     botPeers.forEach((botPeer, index) => {
@@ -57,7 +58,10 @@ async function selectBot() {
     });
 
     const choice = await askQuestion("Masukkan pilihan Anda: ");
-    if (choice === '1') {
+    if (choice === '0') {
+        console.log("Kembali ke menu sebelumnya.");
+        return 0;
+    } else if (choice === '1') {
         const botPeer = await askQuestion("Silakan masukkan bot peer (misalnya, @YourBot): ");
         const url = await askQuestion("Silakan masukkan URL Refferal: ");
         botData[botPeer] = url;
@@ -241,6 +245,10 @@ async function loginWithSessionFile() {
 
     // Memilih bot
     const botSelection = await selectBot();
+    if (botSelection === 0) {
+        console.log("Pengguna memilih untuk kembali ke menu utama.");
+        return;
+    }
     if (!botSelection) {
         console.log("Gagal memilih bot. Program akan berhenti.");
         process.exit(1);
